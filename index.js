@@ -15,7 +15,7 @@ app.post('/orders/create', async (req, res) => {
   try {
     const order = new Order(req.body);
     await order.save();
-    res.status(201).json({ message: 'Order created successfully' });
+    res.status(200).json({ message: 'Order created successfully' });
   } catch (error) {
     if (error.code === 11000) {
       res.status(400).json({ error: 'Duplicate order_id. Please use a different order_id.' });

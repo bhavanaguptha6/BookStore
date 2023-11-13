@@ -1,64 +1,88 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const Book = require('./models/Book');
+const Order = require('./models/order');
 
 const app = express();
 app.use(express.json());
 
 // Connect to your MongoDB database (update the URL)
-mongoose.connect('mongodb://0.0.0.0:27017/bookstore', { useNewUrlParser: true, useUnifiedTopology: true });
+mongoose.connect('mongodb://0.0.0.0:27017/eCommerce', { useNewUrlParser: true, useUnifiedTopology: true });
 
 // CRUD operations
 
-// Create a new book
-app.post('/books', async (req, res) => {
-  const { title, author, summary } = req.body;
+// Create a new order
+app.post('/orders/create', async (req, res) => {
   try {
-    const book = new Book({ title, author, summary });
-    await book.save();
-    res.status(201).json(book);
+    const order = new Order(req.body);
+    await order.save();
+    res.status(201).json({ message: 'Order created successfully' });
   } catch (error) {
-    res.status(500).json({ error: 'Could not create the book.' });
+    if (error.code === 11000) {
+      res.status(400).json({ error: 'Duplicate order_id. Please use a different order_id.' });
+    } else {
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
   }
 });
 
-// Get a list of all books
-app.get('/books', async (req, res) => {
-  const books = await Book.find();
-  res.json(books);
+// Update the order based on order ID
+app.post('/orders/update', async (req, res) => {
+  const { order_id, delivery_date } = req.body;
+  try {
+    const updatedOrder = await Order.findOneAndUpdate(
+      { order_id: order_id },
+      { delivery_date: delivery_date }
+    );
+
+    if (!updatedOrder) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    res.json(updatedOrder);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
 
-// Get details of a specific book by its ID
-app.get('/books/:id', async (req, res) => {
-  const book = await Book.findById(req.params.id);
-  if (!book) {
-    return res.status(404).json({ error: 'Book not found.' });
+// List all orders for a given date
+app.get('/orders/list', async (req, res) => {
+  const { date } = req.query;
+  try {
+    const orders = await Order.find({ order_date: new Date(date) });
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-  res.json(book);
 });
 
-// Update a book's details
-app.put('/books/:id', async (req, res) => {
-  const { title, author, summary } = req.body;
-  const book = await Book.findByIdAndUpdate(
-    req.params.id,
-    { title, author, summary },
-    { new: true }
-  );
-  if (!book) {
-    return res.status(404).json({ error: 'Book not found.' });
+// Query for a specific order with Order ID
+app.all('/orders/search', async (req, res) => {
+  const { order_id } = req.method === 'GET' ? req.query : req.body;
+  try {
+    const order = await Order.findOne({ order_id: order_id });
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    res.json(order);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-  res.json(book);
 });
 
-// Delete a book
-app.delete('/books/:id', async (req, res) => {
-  const book = await Book.findByIdAndRemove(req.params.id);
-  if (!book) {
-    return res.status(404).json({ error: 'Book not found.' });
+// Delete an order with Order ID
+app.delete('/orders/delete', async (req, res) => {
+  const { order_id } = req.body;
+  try {
+    const deletedOrder = await Order.findOneAndDelete({ order_id: order_id });
+    if (!deletedOrder) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    res.json({ message: 'Order deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-  res.json(book);
 });
+
 
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => {
